@@ -1395,7 +1395,7 @@ st.markdown("---")
 st.markdown(
     """
     <div class="footer-text">
-        Dibuat dengan ❤️ oleh <b>Matthew Artur Panahatan Sitorus</b> & <b>Nikita Adriella Virginia Jacob</b><br>
+        Dibuat oleh <b>Matthew Artur Panahatan Sitorus</b> & <b>Nikita Adriella Virginia Jacob</b><br>
         <span style="font-size:0.75rem; opacity:0.8;">AVHershey Simplex Medium • Gemini AI Vision OCR • OpenCV Engine</span>
     </div>
     """,
