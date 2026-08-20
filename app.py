@@ -772,9 +772,9 @@ st.caption(
 )
 
 
-if "timestamp_text" not in st.session_state:
+if "timestamp_box" not in st.session_state:
 
-    st.session_state.timestamp_text = ""
+    st.session_state.timestamp_box = ""
 
 
 # ------------------------------------------------------------
@@ -875,12 +875,36 @@ with st.expander("🔍 OCR dari Screenshot (Gemini AI)"):
         key="screenshot_uploader"
     )
 
+    screenshot_image = None
+
+    if screenshot_file is not None:
+
+        try:
+
+            screenshot_image = load_pil_image_fixed_orientation(
+                screenshot_file
+            )
+
+            st.image(
+                screenshot_image,
+                caption="Preview screenshot yang akan di-OCR",
+                use_container_width=True
+            )
+
+        except Exception as error:
+
+            st.error(
+                f"❌ Screenshot tidak dapat dibaca: {error}"
+            )
+
+            screenshot_image = None
+
     if st.button(
         "OCR (GEMINI AI)",
         type="secondary"
     ):
 
-        if screenshot_file is None:
+        if screenshot_image is None:
 
             st.error(
                 "❌ Belum ada screenshot yang diupload."
@@ -901,10 +925,6 @@ with st.expander("🔍 OCR dari Screenshot (Gemini AI)"):
                     "⏳ Meminta Gemini membaca timestamp..."
                 ):
 
-                    screenshot_image = load_pil_image_fixed_orientation(
-                        screenshot_file
-                    )
-
                     ocr_result = ocr_extract_text_gemini(
                         screenshot_image,
                         gemini_api_key
@@ -913,12 +933,14 @@ with st.expander("🔍 OCR dari Screenshot (Gemini AI)"):
 
                 if ocr_result:
 
-                    st.session_state.timestamp_text = ocr_result
+                    st.session_state.timestamp_box = ocr_result
 
                     st.success(
                         "✅ Hasil OCR sudah dimasukkan ke kotak teks "
                         "di bawah. Silakan cek & edit dulu sebelum GENERATE."
                     )
+
+                    st.rerun()
 
                 else:
 
@@ -936,7 +958,6 @@ with st.expander("🔍 OCR dari Screenshot (Gemini AI)"):
 
 timestamp_text = st.text_area(
     "Timestamp (3 baris)",
-    value=st.session_state.timestamp_text,
     height=130,
     placeholder=(
         "-5.7297568, 105.6231008\n"
@@ -945,8 +966,6 @@ timestamp_text = st.text_area(
     ),
     key="timestamp_box"
 )
-
-st.session_state.timestamp_text = timestamp_text
 
 
 # ------------------------------------------------------------
