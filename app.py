@@ -205,6 +205,21 @@ def get_font_path():
     return font_candidates[0]
 
 
+# ------------------------------------------------------------
+# Cache objek font per (path, size) supaya file .ttf tidak
+# di-parse ulang dari disk setiap kali generate dipanggil --
+# ImageFont.truetype() lumayan mahal kalau dipanggil berulang.
+# ------------------------------------------------------------
+
+@st.cache_resource(show_spinner=False)
+def get_font(font_path, font_size):
+
+    return ImageFont.truetype(
+        font_path,
+        font_size
+    )
+
+
 # ============================================================
 # ============================================================
 # OCR PAKAI GEMINI AI (LOGIKA SAMA DENGAN VERSI COLAB)
@@ -511,16 +526,17 @@ def draw_timestamp(
 
     current_x = float(x)
 
+    # Lebar spasi sama untuk semua karakter " " di baris yang
+    # sama, jadi dihitung sekali saja sebelum loop (sebelumnya
+    # dihitung ulang tiap kali ketemu spasi).
+    space_width = draw.textlength(
+        " ",
+        font=font
+    ) * space_scale
+
     for char in text:
 
         if char == " ":
-
-            space_width = draw.textlength(
-                " ",
-                font=font
-            )
-
-            space_width *= space_scale
 
             current_x += (
                 space_width +
@@ -662,20 +678,17 @@ def generate_timestamp_image(
 
     font_path = get_font_path()
 
-    font = ImageFont.truetype(
+    font = get_font(
         font_path,
         font_size
     )
 
 
-    image_rgb = cv2.cvtColor(
-        image_cv,
-        cv2.COLOR_BGR2RGB
-    )
-
-
+    # Foto sudah dalam urutan channel RGB sejak diupload (lihat
+    # bagian UI), jadi langsung dipakai tanpa konversi warna
+    # bolak-balik yang sia-sia.
     pil_image = Image.fromarray(
-        image_rgb
+        image_cv
     )
 
 
@@ -804,6 +817,25 @@ st.set_page_config(
 )
 
 
+st.markdown(
+    """
+    <style>
+    div[data-testid="stDownloadButton"] button,
+    div[data-testid="stButton"] button {
+        border-radius: 10px;
+        font-weight: 600;
+    }
+    div[data-testid="stMetric"] {
+        background-color: rgba(120, 120, 120, 0.08);
+        border-radius: 10px;
+        padding: 10px 14px;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+
+
 st.title("🕒 Timestamp Generator")
 
 st.caption(
@@ -811,63 +843,118 @@ st.caption(
 )
 
 
-if "timestamp_box" not in st.session_state:
+# ------------------------------------------------------------
+# SESSION STATE AWAL
+# ------------------------------------------------------------
+#
+# uploader_version dipakai untuk "mereset" widget upload/paste
+# (file_uploader & paste button tidak bisa dikosongkan langsung
+# lewat session_state, jadi triknya bikin key baru supaya
+# Streamlit menganggapnya widget baru yang masih kosong).
+# ------------------------------------------------------------
+
+DEFAULTS = {
+    "timestamp_box": "",
+    "uploader_version": 0,
+    "generated_result": None,
+    "last_ocr_signature": None,
+}
+
+for state_key, default_value in DEFAULTS.items():
+
+    if state_key not in st.session_state:
+
+        st.session_state[state_key] = default_value
+
+
+def reset_app():
+
+    st.session_state.uploader_version += 1
 
     st.session_state.timestamp_box = ""
+
+    st.session_state.last_ocr_signature = None
+
+    st.session_state.generated_result = None
+
+
+uploader_version = st.session_state.uploader_version
 
 
 # ------------------------------------------------------------
 # 1. UPLOAD FOTO UTAMA
 # ------------------------------------------------------------
 
-st.header("1. Upload Foto")
+st.header("1️⃣ Upload Foto")
 
-photo_file = st.file_uploader(
-    "Pilih foto utama",
-    type=["jpg", "jpeg", "png"],
-    key="photo_uploader"
-)
+with st.container(border=True):
 
-
-image_cv = None
-
-if photo_file is not None:
-
-    try:
-
-        photo_pil = load_pil_image_fixed_orientation(
-            photo_file
-        )
-
-        image_cv = cv2.cvtColor(
-            np.array(photo_pil),
-            cv2.COLOR_RGB2BGR
-        )
-
-    except Exception as error:
-
-        st.error(
-            f"❌ Foto tidak dapat dibaca: {error}"
-        )
-
-        image_cv = None
+    photo_file = st.file_uploader(
+        "Pilih foto utama",
+        type=["jpg", "jpeg", "png"],
+        key=f"photo_uploader_{uploader_version}"
+    )
 
 
-    if image_cv is not None:
+    image_cv = None
 
-        height, width = image_cv.shape[:2]
+    if photo_file is not None:
 
-        st.success(
-            f"File: {photo_file.name}  |  Resolusi: {width} x {height}"
-        )
+        try:
 
-        st.image(
-            cv2.cvtColor(
+            photo_pil = load_pil_image_fixed_orientation(
+                photo_file
+            )
+
+            # Disimpan langsung dalam urutan channel RGB (bukan BGR)
+            # supaya tidak perlu bolak-balik convert warna nanti pas
+            # digambar timestamp-nya -- hanya dikonversi ke BGR sekali,
+            # di akhir, saat proses encode file downloadnya (cv2.imencode
+            # butuh BGR).
+            image_cv = np.array(
+                photo_pil
+            )
+
+        except Exception as error:
+
+            st.error(
+                f"❌ Foto tidak dapat dibaca: {error}"
+            )
+
+            image_cv = None
+
+
+        if image_cv is not None:
+
+            height, width = image_cv.shape[:2]
+
+            col_name, col_res = st.columns(2)
+
+            with col_name:
+
+                st.metric(
+                    "📄 Nama File",
+                    photo_file.name
+                )
+
+            with col_res:
+
+                st.metric(
+                    "📐 Resolusi",
+                    f"{width} × {height}"
+                )
+
+            st.image(
                 image_cv,
-                cv2.COLOR_BGR2RGB
-            ),
-            caption="Preview foto asli (orientasi sudah dinormalisasi)",
-            use_container_width=True
+                caption="Preview foto asli (orientasi sudah dinormalisasi)",
+                use_container_width=True
+            )
+
+    else:
+
+        st.info(
+            "⬆️ Belum ada foto. Upload foto utama yang mau "
+            "ditambahkan timestamp."
         )
 
 
@@ -875,190 +962,191 @@ if photo_file is not None:
 # 2. MASUKKAN TIMESTAMP
 # ------------------------------------------------------------
 
-st.header("2. Masukkan Timestamp")
+st.header("2️⃣ Masukkan Timestamp")
 
-st.markdown(
-    """
-Ada 2 cara:
-
-1. Ketik / paste manual 3 baris di kotak teks di bawah.
-2. Paste (Ctrl+V) atau upload screenshot timestamp di bawah —
-   OCR jalan **otomatis**, gak perlu klik apa-apa. Cek dulu
-   hasilnya sebelum klik **GENERATE**.
-
-Baris 1 = Koordinat
-Baris 2 = Lokasi
-Baris 3 = Tanggal & Waktu
-"""
+tab_manual, tab_ocr = st.tabs(
+    [
+        "✍️ Ketik Manual",
+        "🔍 OCR dari Screenshot (Gemini AI)"
+    ]
 )
 
+with tab_manual:
 
-st.subheader("🔍 OCR dari Screenshot (Gemini AI)")
-
-gemini_api_key = st.secrets.get(
-    "GEMINI_API_KEY",
-    ""
-)
-
-if not gemini_api_key:
-
-    st.warning(
-        "⚠️ `GEMINI_API_KEY` belum diset di Secrets. "
-        "Fitur OCR tidak akan jalan sampai API key dikonfigurasi "
-        "di Streamlit Cloud (Settings → Secrets), bukan di kode."
+    st.caption(
+        "Ketik atau paste teks manual, 3 baris: "
+        "koordinat, lokasi, lalu tanggal & waktu."
     )
 
-st.caption(
-    "Screenshot dulu area timestamp-nya (Win+Shift+S di Windows, "
-    "Cmd+Shift+4 di Mac), lalu klik tombol paste di bawah dan "
-    "tekan Ctrl+V (Cmd+V di Mac). Didukung di Chrome/Edge/Safari "
-    "(belum jalan di Firefox) — kalau browser gak support, "
-    "upload manual saja."
-)
+with tab_ocr:
 
-paste_result = pbutton(
-    label="📋 Klik lalu Ctrl+V untuk paste screenshot",
-    key="screenshot_paste"
-)
+    gemini_api_key = st.secrets.get(
+        "GEMINI_API_KEY",
+        ""
+    )
 
-screenshot_file = st.file_uploader(
-    "atau upload file screenshot",
-    type=["jpg", "jpeg", "png"],
-    key="screenshot_uploader"
-)
+    if not gemini_api_key:
 
-
-screenshot_image = None
-
-if paste_result.image_data is not None:
-
-    try:
-
-        screenshot_image = ImageOps.exif_transpose(
-            paste_result.image_data
-        ).convert("RGB")
-
-    except Exception as error:
-
-        st.error(
-            f"❌ Screenshot hasil paste tidak dapat dibaca: {error}"
+        st.warning(
+            "⚠️ `GEMINI_API_KEY` belum diset di Secrets. "
+            "Fitur OCR tidak akan jalan sampai API key dikonfigurasi "
+            "di Streamlit Cloud (Settings → Secrets), bukan di kode."
         )
 
-        screenshot_image = None
+    st.caption(
+        "Screenshot dulu area timestamp-nya (Win+Shift+S di Windows, "
+        "Cmd+Shift+4 di Mac), lalu klik tombol paste di bawah dan "
+        "tekan Ctrl+V (Cmd+V di Mac). Didukung di Chrome/Edge/Safari "
+        "(belum jalan di Firefox) — kalau browser gak support, "
+        "upload manual saja. Hasilnya otomatis masuk ke kotak teks "
+        "di bawah, gak perlu klik apa-apa lagi."
+    )
 
-elif screenshot_file is not None:
+    paste_result = pbutton(
+        label="📋 Klik lalu Ctrl+V untuk paste screenshot",
+        key=f"screenshot_paste_{uploader_version}"
+    )
 
-    try:
-
-        screenshot_image = load_pil_image_fixed_orientation(
-            screenshot_file
-        )
-
-    except Exception as error:
-
-        st.error(
-            f"❌ Screenshot tidak dapat dibaca: {error}"
-        )
-
-        screenshot_image = None
-
-
-if screenshot_image is not None:
-
-    st.image(
-        screenshot_image,
-        caption="Preview screenshot yang akan di-OCR",
-        use_container_width=True
+    screenshot_file = st.file_uploader(
+        "atau upload file screenshot",
+        type=["jpg", "jpeg", "png"],
+        key=f"screenshot_uploader_{uploader_version}"
     )
 
 
-    # --------------------------------------------------------
-    # Jalankan OCR OTOMATIS begitu ada screenshot baru (paste
-    # ataupun upload), tanpa perlu klik tombol. Dicek pakai hash
-    # gambar supaya tidak OCR ulang berkali-kali untuk gambar
-    # yang sama di setiap rerun Streamlit.
-    # --------------------------------------------------------
+    screenshot_image = None
 
-    image_buffer_for_hash = io.BytesIO()
-
-    screenshot_image.save(
-        image_buffer_for_hash,
-        format="PNG"
-    )
-
-    screenshot_signature = hashlib.md5(
-        image_buffer_for_hash.getvalue()
-    ).hexdigest()
-
-    already_processed = (
-        st.session_state.get("last_ocr_signature") == screenshot_signature
-    )
-
-    col_ocr_status, col_ocr_button = st.columns(
-        [3, 1]
-    )
-
-    with col_ocr_button:
-
-        rerun_ocr_clicked = st.button(
-            "🔁 OCR ulang",
-            type="secondary",
-            disabled=not gemini_api_key
-        )
-
-    should_run_ocr = (
-        gemini_api_key
-        and (not already_processed or rerun_ocr_clicked)
-    )
-
-    if should_run_ocr:
+    if paste_result.image_data is not None:
 
         try:
 
-            with col_ocr_status:
-
-                with st.spinner(
-                    "⏳ Meminta Gemini membaca timestamp..."
-                ):
-
-                    ocr_result = ocr_extract_text_gemini(
-                        screenshot_image,
-                        gemini_api_key
-                    )
-
-
-            st.session_state.last_ocr_signature = screenshot_signature
-
-            if ocr_result:
-
-                st.session_state.timestamp_box = ocr_result
-
-                st.success(
-                    "✅ Hasil OCR sudah dimasukkan ke kotak teks "
-                    "di bawah. Silakan cek & edit dulu sebelum GENERATE."
-                )
-
-                st.rerun()
-
-            else:
-
-                st.warning(
-                    "⚠️ Gemini tidak mengembalikan teks apapun."
-                )
-
+            screenshot_image = ImageOps.exif_transpose(
+                paste_result.image_data
+            ).convert("RGB")
 
         except Exception as error:
 
             st.error(
-                f"❌ ERROR OCR GEMINI: {error}"
+                f"❌ Screenshot hasil paste tidak dapat dibaca: {error}"
             )
 
-    elif already_processed:
+            screenshot_image = None
 
-        st.caption(
-            "✅ Screenshot ini sudah di-OCR. Klik **OCR ulang** "
-            "kalau mau coba baca ulang."
+    elif screenshot_file is not None:
+
+        try:
+
+            screenshot_image = load_pil_image_fixed_orientation(
+                screenshot_file
+            )
+
+        except Exception as error:
+
+            st.error(
+                f"❌ Screenshot tidak dapat dibaca: {error}"
+            )
+
+            screenshot_image = None
+
+
+    if screenshot_image is not None:
+
+        st.image(
+            screenshot_image,
+            caption="Preview screenshot yang akan di-OCR",
+            use_container_width=True
         )
+
+
+        # ----------------------------------------------------
+        # Jalankan OCR OTOMATIS begitu ada screenshot baru
+        # (paste ataupun upload), tanpa perlu klik tombol.
+        # Dicek pakai hash gambar supaya tidak OCR ulang
+        # berkali-kali untuk gambar yang sama di setiap rerun
+        # Streamlit.
+        # ----------------------------------------------------
+
+        image_buffer_for_hash = io.BytesIO()
+
+        screenshot_image.save(
+            image_buffer_for_hash,
+            format="PNG"
+        )
+
+        screenshot_signature = hashlib.md5(
+            image_buffer_for_hash.getvalue()
+        ).hexdigest()
+
+        already_processed = (
+            st.session_state.last_ocr_signature == screenshot_signature
+        )
+
+        col_ocr_status, col_ocr_button = st.columns(
+            [3, 1]
+        )
+
+        with col_ocr_button:
+
+            rerun_ocr_clicked = st.button(
+                "🔁 OCR ulang",
+                type="secondary",
+                disabled=not gemini_api_key,
+                use_container_width=True
+            )
+
+        should_run_ocr = (
+            gemini_api_key
+            and (not already_processed or rerun_ocr_clicked)
+        )
+
+        if should_run_ocr:
+
+            try:
+
+                with col_ocr_status:
+
+                    with st.spinner(
+                        "⏳ Meminta Gemini membaca timestamp..."
+                    ):
+
+                        ocr_result = ocr_extract_text_gemini(
+                            screenshot_image,
+                            gemini_api_key
+                        )
+
+
+                st.session_state.last_ocr_signature = screenshot_signature
+
+                if ocr_result:
+
+                    st.session_state.timestamp_box = ocr_result
+
+                    st.success(
+                        "✅ Hasil OCR sudah dimasukkan ke kotak teks "
+                        "di bawah. Silakan cek & edit dulu sebelum GENERATE."
+                    )
+
+                    st.rerun()
+
+                else:
+
+                    st.warning(
+                        "⚠️ Gemini tidak mengembalikan teks apapun."
+                    )
+
+
+            except Exception as error:
+
+                st.error(
+                    f"❌ ERROR OCR GEMINI: {error}"
+                )
+
+        elif already_processed:
+
+            st.caption(
+                "✅ Screenshot ini sudah di-OCR. Klik **OCR ulang** "
+                "kalau mau coba baca ulang."
+            )
 
 
 timestamp_text = st.text_area(
@@ -1077,65 +1165,172 @@ timestamp_text = st.text_area(
 # 3. GENERATE
 # ------------------------------------------------------------
 
-st.header("3. Generate")
+st.header("3️⃣ Generate")
 
-if st.button(
+photo_ready = image_cv is not None
+timestamp_ready = bool(timestamp_text.strip())
+
+if not photo_ready or not timestamp_ready:
+
+    missing = []
+
+    if not photo_ready:
+        missing.append("foto (langkah 1)")
+
+    if not timestamp_ready:
+        missing.append("timestamp (langkah 2)")
+
+    st.caption(
+        "⏳ Lengkapi dulu: " + " & ".join(missing) + "."
+    )
+
+generate_clicked = st.button(
     "GENERATE TIMESTAMP",
-    type="primary"
-):
+    type="primary",
+    disabled=not (photo_ready and timestamp_ready),
+    use_container_width=True
+)
 
-    if image_cv is None:
+if generate_clicked:
 
-        st.error(
-            "❌ Upload foto dulu di langkah 1."
-        )
+    try:
 
-    elif not timestamp_text.strip():
+        with st.spinner(
+            "Menggambar timestamp..."
+        ):
 
-        st.error(
-            "❌ Timestamp belum diisi."
-        )
-
-    else:
-
-        try:
-
-            with st.spinner(
-                "Menggambar timestamp..."
-            ):
-
-                pil_image, info = generate_timestamp_image(
-                    image_cv,
-                    timestamp_text
-                )
-
-
-            st.success(
-                "✅ TIMESTAMP BERHASIL DIBUAT"
+            pil_image, info = generate_timestamp_image(
+                image_cv,
+                timestamp_text
             )
 
-            with st.expander(
-                "Detail timestamp & rendering",
-                expanded=True
-            ):
 
-                st.write(
-                    "**Baris 1 / KOORDINAT:**",
-                    info["line1"]
-                )
+        # ----------------------------------------------------
+        # SIAPKAN FILE UNTUK DOWNLOAD
+        # ----------------------------------------------------
 
-                st.write(
-                    "**Baris 2 / LOKASI:**",
-                    info["line2"]
-                )
+        name, ext = os.path.splitext(
+            photo_file.name
+        )
 
-                st.write(
-                    "**Baris 3 / TANGGAL & WAKTU:**",
-                    info["line3"]
-                )
+        if not ext:
 
-                st.markdown(
-                    f"""
+            ext = ".jpg"
+
+        random_word = (
+            secrets.choice(RANDOM_WORD_LIST_A) +
+            secrets.choice(RANDOM_WORD_LIST_B)
+        )
+
+        output_file_name = (
+            name +
+            "_" +
+            random_word +
+            ext
+        )
+
+
+        result_rgb = np.array(
+            pil_image
+        )
+
+        result_cv = cv2.cvtColor(
+            result_rgb,
+            cv2.COLOR_RGB2BGR
+        )
+
+
+        if ext.lower() in [
+            ".jpg",
+            ".jpeg"
+        ]:
+
+            encode_success, encoded_bytes = cv2.imencode(
+                ext,
+                result_cv,
+                [
+                    cv2.IMWRITE_JPEG_QUALITY,
+                    95
+                ]
+            )
+
+            mime_type = "image/jpeg"
+
+        else:
+
+            encode_success, encoded_bytes = cv2.imencode(
+                ext,
+                result_cv
+            )
+
+            mime_type = "image/png"
+
+
+        if encode_success:
+
+            st.session_state.generated_result = {
+                "pil_image": pil_image,
+                "info": info,
+                "output_file_name": output_file_name,
+                "encoded_bytes": encoded_bytes.tobytes(),
+                "mime_type": mime_type,
+            }
+
+            st.rerun()
+
+        else:
+
+            st.error(
+                "❌ Gagal encode gambar hasil."
+            )
+
+
+    except Exception as error:
+
+        st.error(
+            f"❌ ERROR: {error}"
+        )
+
+
+# ------------------------------------------------------------
+# HASIL (persist di session_state supaya tetap tampil sampai
+# di-reset, walaupun ada widget lain yang dipencet)
+# ------------------------------------------------------------
+
+result = st.session_state.generated_result
+
+if result is not None:
+
+    st.divider()
+
+    st.success(
+        "✅ TIMESTAMP BERHASIL DIBUAT"
+    )
+
+    with st.expander(
+        "Detail timestamp & rendering",
+        expanded=True
+    ):
+
+        info = result["info"]
+
+        st.write(
+            "**Baris 1 / KOORDINAT:**",
+            info["line1"]
+        )
+
+        st.write(
+            "**Baris 2 / LOKASI:**",
+            info["line2"]
+        )
+
+        st.write(
+            "**Baris 3 / TANGGAL & WAKTU:**",
+            info["line3"]
+        )
+
+        st.markdown(
+            f"""
 - Font: AVHershey Simplex Medium
 - Font Size: {info['font_size']}px ({DEFAULT_FONT_SIZE_PERCENT}% dari lebar foto)
 - Scale Ratio: {info['scale_ratio']:.4f}
@@ -1145,99 +1340,40 @@ if st.button(
 - Bottom Margin: {info['bottom_margin']}px
 - Line Spacing: {info['line_spacing']}px
 """
-                )
+        )
 
 
-            st.image(
-                pil_image,
-                caption="Preview hasil",
-                use_container_width=True
-            )
+    st.image(
+        result["pil_image"],
+        caption="Preview hasil",
+        use_container_width=True
+    )
 
 
-            # ------------------------------------------------
-            # SIAPKAN FILE UNTUK DOWNLOAD
-            # ------------------------------------------------
+    col_download, col_reset = st.columns(2)
 
-            name, ext = os.path.splitext(
-                photo_file.name
-            )
+    with col_download:
 
-            if not ext:
+        st.download_button(
+            label="⬇️ DOWNLOAD HASIL",
+            data=result["encoded_bytes"],
+            file_name=result["output_file_name"],
+            mime=result["mime_type"],
+            type="primary",
+            use_container_width=True
+        )
 
-                ext = ".jpg"
+    with col_reset:
 
-            random_word = (
-                secrets.choice(RANDOM_WORD_LIST_A) +
-                secrets.choice(RANDOM_WORD_LIST_B)
-            )
+        if st.button(
+            "🔄 Reset & Mulai Lagi",
+            type="secondary",
+            use_container_width=True
+        ):
 
-            output_file_name = (
-                name +
-                "_" +
-                random_word +
-                ext
-            )
+            reset_app()
 
-
-            result_rgb = np.array(
-                pil_image
-            )
-
-            result_cv = cv2.cvtColor(
-                result_rgb,
-                cv2.COLOR_RGB2BGR
-            )
-
-
-            if ext.lower() in [
-                ".jpg",
-                ".jpeg"
-            ]:
-
-                encode_success, encoded_bytes = cv2.imencode(
-                    ext,
-                    result_cv,
-                    [
-                        cv2.IMWRITE_JPEG_QUALITY,
-                        95
-                    ]
-                )
-
-                mime_type = "image/jpeg"
-
-            else:
-
-                encode_success, encoded_bytes = cv2.imencode(
-                    ext,
-                    result_cv
-                )
-
-                mime_type = "image/png"
-
-
-            if encode_success:
-
-                st.download_button(
-                    label="⬇️ DOWNLOAD HASIL",
-                    data=encoded_bytes.tobytes(),
-                    file_name=output_file_name,
-                    mime=mime_type,
-                    type="primary"
-                )
-
-            else:
-
-                st.error(
-                    "❌ Gagal encode gambar hasil."
-                )
-
-
-        except Exception as error:
-
-            st.error(
-                f"❌ ERROR: {error}"
-            )
+            st.rerun()
 
 
 # ------------------------------------------------------------
