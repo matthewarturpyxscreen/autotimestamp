@@ -28,6 +28,7 @@ import os
 import re
 import io
 import glob
+import hashlib
 import subprocess
 
 import cv2
@@ -43,6 +44,8 @@ from PIL import (
 
 from google import genai
 from google.genai import types as genai_types
+
+from streamlit_paste_button import paste_image_button as pbutton
 
 
 # ============================================================
@@ -843,9 +846,9 @@ st.markdown(
 Ada 2 cara:
 
 1. Ketik / paste manual 3 baris di kotak teks di bawah.
-2. Upload screenshot timestamp, isi API key Gemini, klik
-   **OCR (GEMINI AI)** — hasilnya otomatis masuk ke kotak teks.
-   Cek dulu hasilnya sebelum klik **GENERATE**.
+2. Paste (Ctrl+V) atau upload screenshot timestamp di bawah —
+   OCR jalan **otomatis**, gak perlu klik apa-apa. Cek dulu
+   hasilnya sebelum klik **GENERATE**.
 
 Baris 1 = Koordinat
 Baris 2 = Lokasi
@@ -854,72 +857,129 @@ Baris 3 = Tanggal & Waktu
 )
 
 
-with st.expander("🔍 OCR dari Screenshot (Gemini AI)"):
+st.subheader("🔍 OCR dari Screenshot (Gemini AI)")
 
-    gemini_api_key = st.secrets.get(
-        "GEMINI_API_KEY",
-        ""
+gemini_api_key = st.secrets.get(
+    "GEMINI_API_KEY",
+    ""
+)
+
+if not gemini_api_key:
+
+    st.warning(
+        "⚠️ `GEMINI_API_KEY` belum diset di Secrets. "
+        "Fitur OCR tidak akan jalan sampai API key dikonfigurasi "
+        "di Streamlit Cloud (Settings → Secrets), bukan di kode."
     )
 
-    if not gemini_api_key:
+st.caption(
+    "Screenshot dulu area timestamp-nya (Win+Shift+S di Windows, "
+    "Cmd+Shift+4 di Mac), lalu klik tombol paste di bawah dan "
+    "tekan Ctrl+V (Cmd+V di Mac). Didukung di Chrome/Edge/Safari "
+    "(belum jalan di Firefox) — kalau browser gak support, "
+    "upload manual saja."
+)
 
-        st.warning(
-            "⚠️ `GEMINI_API_KEY` belum diset di Secrets. "
-            "Fitur OCR tidak akan jalan sampai API key dikonfigurasi "
-            "di Streamlit Cloud (Settings → Secrets), bukan di kode."
+paste_result = pbutton(
+    label="📋 Klik lalu Ctrl+V untuk paste screenshot",
+    key="screenshot_paste"
+)
+
+screenshot_file = st.file_uploader(
+    "atau upload file screenshot",
+    type=["jpg", "jpeg", "png"],
+    key="screenshot_uploader"
+)
+
+
+screenshot_image = None
+
+if paste_result.image_data is not None:
+
+    try:
+
+        screenshot_image = ImageOps.exif_transpose(
+            paste_result.image_data
+        ).convert("RGB")
+
+    except Exception as error:
+
+        st.error(
+            f"❌ Screenshot hasil paste tidak dapat dibaca: {error}"
         )
 
-    screenshot_file = st.file_uploader(
-        "Upload screenshot timestamp",
-        type=["jpg", "jpeg", "png"],
-        key="screenshot_uploader"
+        screenshot_image = None
+
+elif screenshot_file is not None:
+
+    try:
+
+        screenshot_image = load_pil_image_fixed_orientation(
+            screenshot_file
+        )
+
+    except Exception as error:
+
+        st.error(
+            f"❌ Screenshot tidak dapat dibaca: {error}"
+        )
+
+        screenshot_image = None
+
+
+if screenshot_image is not None:
+
+    st.image(
+        screenshot_image,
+        caption="Preview screenshot yang akan di-OCR",
+        use_container_width=True
     )
 
-    screenshot_image = None
 
-    if screenshot_file is not None:
+    # --------------------------------------------------------
+    # Jalankan OCR OTOMATIS begitu ada screenshot baru (paste
+    # ataupun upload), tanpa perlu klik tombol. Dicek pakai hash
+    # gambar supaya tidak OCR ulang berkali-kali untuk gambar
+    # yang sama di setiap rerun Streamlit.
+    # --------------------------------------------------------
+
+    image_buffer_for_hash = io.BytesIO()
+
+    screenshot_image.save(
+        image_buffer_for_hash,
+        format="PNG"
+    )
+
+    screenshot_signature = hashlib.md5(
+        image_buffer_for_hash.getvalue()
+    ).hexdigest()
+
+    already_processed = (
+        st.session_state.get("last_ocr_signature") == screenshot_signature
+    )
+
+    col_ocr_status, col_ocr_button = st.columns(
+        [3, 1]
+    )
+
+    with col_ocr_button:
+
+        rerun_ocr_clicked = st.button(
+            "🔁 OCR ulang",
+            type="secondary",
+            disabled=not gemini_api_key
+        )
+
+    should_run_ocr = (
+        gemini_api_key
+        and (not already_processed or rerun_ocr_clicked)
+    )
+
+    if should_run_ocr:
 
         try:
 
-            screenshot_image = load_pil_image_fixed_orientation(
-                screenshot_file
-            )
-
-            st.image(
-                screenshot_image,
-                caption="Preview screenshot yang akan di-OCR",
-                use_container_width=True
-            )
-
-        except Exception as error:
-
-            st.error(
-                f"❌ Screenshot tidak dapat dibaca: {error}"
-            )
-
-            screenshot_image = None
-
-    if st.button(
-        "OCR (GEMINI AI)",
-        type="secondary"
-    ):
-
-        if screenshot_image is None:
-
-            st.error(
-                "❌ Belum ada screenshot yang diupload."
-            )
-
-        elif not gemini_api_key:
-
-            st.error(
-                "❌ API key Gemini belum dikonfigurasi di server "
-                "(Streamlit Secrets)."
-            )
-
-        else:
-
-            try:
+            with col_ocr_status:
 
                 with st.spinner(
                     "⏳ Meminta Gemini membaca timestamp..."
@@ -931,29 +991,38 @@ with st.expander("🔍 OCR dari Screenshot (Gemini AI)"):
                     )
 
 
-                if ocr_result:
+            st.session_state.last_ocr_signature = screenshot_signature
 
-                    st.session_state.timestamp_box = ocr_result
+            if ocr_result:
 
-                    st.success(
-                        "✅ Hasil OCR sudah dimasukkan ke kotak teks "
-                        "di bawah. Silakan cek & edit dulu sebelum GENERATE."
-                    )
+                st.session_state.timestamp_box = ocr_result
 
-                    st.rerun()
-
-                else:
-
-                    st.warning(
-                        "⚠️ Gemini tidak mengembalikan teks apapun."
-                    )
-
-
-            except Exception as error:
-
-                st.error(
-                    f"❌ ERROR OCR GEMINI: {error}"
+                st.success(
+                    "✅ Hasil OCR sudah dimasukkan ke kotak teks "
+                    "di bawah. Silakan cek & edit dulu sebelum GENERATE."
                 )
+
+                st.rerun()
+
+            else:
+
+                st.warning(
+                    "⚠️ Gemini tidak mengembalikan teks apapun."
+                )
+
+
+        except Exception as error:
+
+            st.error(
+                f"❌ ERROR OCR GEMINI: {error}"
+            )
+
+    elif already_processed:
+
+        st.caption(
+            "✅ Screenshot ini sudah di-OCR. Klik **OCR ulang** "
+            "kalau mau coba baca ulang."
+        )
 
 
 timestamp_text = st.text_area(
