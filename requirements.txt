@@ -3,3 +3,4 @@ opencv-python-headless
 numpy
 pillow
 google-genai
+streamlit-paste-button
