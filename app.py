@@ -69,14 +69,11 @@ REFERENCE_WIDTH = 2048
 
 REFERENCE_FONT_SIZE = 70
 
-# Ukuran default dinyatakan sebagai % dari lebar foto, supaya
+# Ukuran timestamp dinyatakan sebagai % dari lebar foto, supaya
 # otomatis mengikuti resolusi/rasio foto apapun yang diupload.
-# Nilai ini dihitung dari rasio REFERENCE_FONT_SIZE / REFERENCE_WIDTH
-# di atas, jadi persis sama dengan ukuran versi lama secara default.
-DEFAULT_FONT_SIZE_PERCENT = round(
-    REFERENCE_FONT_SIZE / REFERENCE_WIDTH * 100,
-    2
-)
+# Diatur langsung di sini oleh program (bukan lewat UI) --
+# tinggal ganti angka ini kalau mau lebih besar/kecil lagi.
+DEFAULT_FONT_SIZE_PERCENT = 5.0
 
 
 # ============================================================
