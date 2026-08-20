@@ -847,14 +847,16 @@ st.caption(
 # SESSION STATE AWAL
 # ------------------------------------------------------------
 #
-# uploader_version dipakai untuk "mereset" widget upload/paste
-# (file_uploader & paste button tidak bisa dikosongkan langsung
-# lewat session_state, jadi triknya bikin key baru supaya
-# Streamlit menganggapnya widget baru yang masih kosong).
+# uploader_version dipakai untuk "mereset" SEMUA widget input
+# (file_uploader, paste button, DAN text_area timestamp).
+# Widget-widget itu tidak bisa dikosongkan langsung lewat
+# session_state kalau sudah pernah dirender di run yang sama
+# (Streamlit akan melempar StreamlitAPIException), jadi triknya
+# bikin key baru per widget supaya Streamlit menganggapnya
+# widget baru yang masih kosong.
 # ------------------------------------------------------------
 
 DEFAULTS = {
-    "timestamp_box": "",
     "uploader_version": 0,
     "generated_result": None,
     "last_ocr_signature": None,
@@ -871,14 +873,14 @@ def reset_app():
 
     st.session_state.uploader_version += 1
 
-    st.session_state.timestamp_box = ""
-
     st.session_state.last_ocr_signature = None
 
     st.session_state.generated_result = None
 
 
 uploader_version = st.session_state.uploader_version
+
+timestamp_key = f"timestamp_box_{uploader_version}"
 
 
 # ------------------------------------------------------------
@@ -1119,7 +1121,7 @@ with tab_ocr:
 
                 if ocr_result:
 
-                    st.session_state.timestamp_box = ocr_result
+                    st.session_state[timestamp_key] = ocr_result
 
                     st.success(
                         "✅ Hasil OCR sudah dimasukkan ke kotak teks "
@@ -1157,7 +1159,7 @@ timestamp_text = st.text_area(
         "Sukaratu, Lampung Selatan, Lampung\n"
         "18/8/2026 10:12:35 WIB"
     ),
-    key="timestamp_box"
+    key=timestamp_key
 )
 
 
