@@ -29,6 +29,7 @@ import re
 import io
 import glob
 import hashlib
+import secrets
 import subprocess
 
 import cv2
@@ -66,7 +67,16 @@ REFERENCE_WIDTH = 2048
 # FONT SIZE
 # ============================================================
 
-REFERENCE_FONT_SIZE = 73
+REFERENCE_FONT_SIZE = 70
+
+# Ukuran default dinyatakan sebagai % dari lebar foto, supaya
+# otomatis mengikuti resolusi/rasio foto apapun yang diupload.
+# Nilai ini dihitung dari rasio REFERENCE_FONT_SIZE / REFERENCE_WIDTH
+# di atas, jadi persis sama dengan ukuran versi lama secara default.
+DEFAULT_FONT_SIZE_PERCENT = round(
+    REFERENCE_FONT_SIZE / REFERENCE_WIDTH * 100,
+    2
+)
 
 
 # ============================================================
@@ -142,6 +152,27 @@ TEXT_ANCHOR = "ls"
 # ============================================================
 
 REPO_DIR = "Hershey_font_TTF"
+
+
+# ============================================================
+# DAFTAR KATA UNTUK NAMA FILE RANDOM
+# ============================================================
+#
+# Dipakai buat bikin nama file download unik & gampang dibaca,
+# contoh: FOTO_hangatpelangi.jpg
+# ============================================================
+
+RANDOM_WORD_LIST_A = [
+    "hangat", "cerah", "biru", "senja", "kilat", "lembut",
+    "gemilang", "rindang", "damai", "megah", "riang", "sejuk",
+    "terang", "elok", "anggun", "cepat", "tenang", "ceria",
+]
+
+RANDOM_WORD_LIST_B = [
+    "pelangi", "senja", "camar", "kabut", "elang", "bintang",
+    "ombak", "awan", "bukit", "kilau", "embun", "cakrawala",
+    "merpati", "fajar", "angin", "karang", "hutan", "samudra",
+]
 
 
 @st.cache_resource(show_spinner="Menyiapkan font Hershey...")
@@ -547,7 +578,8 @@ def draw_timestamp(
 
 def generate_timestamp_image(
     image_cv,
-    raw_timestamp_text
+    raw_timestamp_text,
+    font_size_percent=DEFAULT_FONT_SIZE_PERCENT
 ):
 
     lines = parse_timestamp(
@@ -564,18 +596,25 @@ def generate_timestamp_image(
     height, width = image_cv.shape[:2]
 
 
-    scale_ratio = (
-        width /
-        REFERENCE_WIDTH
-    )
-
+    # --------------------------------------------------------
+    # Font size dihitung langsung dari % lebar foto, jadi
+    # otomatis menyesuaikan resolusi/rasio foto apapun yang
+    # diupload. Elemen lain (outline, margin, spacing) ikut
+    # di-scale proporsional lewat scale_ratio, sama seperti
+    # sebelumnya.
+    # --------------------------------------------------------
 
     font_size = max(
         1,
         round(
-            REFERENCE_FONT_SIZE *
-            scale_ratio
+            width *
+            (font_size_percent / 100)
         )
+    )
+
+    scale_ratio = (
+        font_size /
+        REFERENCE_FONT_SIZE
     )
 
 
@@ -1101,7 +1140,7 @@ if st.button(
                 st.markdown(
                     f"""
 - Font: AVHershey Simplex Medium
-- Font Size: {info['font_size']}px
+- Font Size: {info['font_size']}px ({DEFAULT_FONT_SIZE_PERCENT}% dari lebar foto)
 - Scale Ratio: {info['scale_ratio']:.4f}
 - Outline Width: {info['outline_width']}px
 - Letter Spacing: {info['letter_spacing']:.2f}px
@@ -1131,9 +1170,15 @@ if st.button(
 
                 ext = ".jpg"
 
+            random_word = (
+                secrets.choice(RANDOM_WORD_LIST_A) +
+                secrets.choice(RANDOM_WORD_LIST_B)
+            )
+
             output_file_name = (
                 name +
-                "_TIMESTAMP_V7_4" +
+                "_" +
+                random_word +
                 ext
             )
 
