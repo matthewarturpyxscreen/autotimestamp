@@ -1,5 +1,5 @@
 # ============================================================
-# TIMESTAMP GENERATOR V7.4 - STREAMLIT UI (ENHANCED UI)
+# TIMESTAMP GENERATOR V7.5 - STREAMLIT UI (ENHANCED UI + AUTOFIT)
 # ============================================================
 #
 # FONT:
@@ -12,6 +12,12 @@
 # Gemini OCR). Fungsi inti (normalisasi teks, parsing
 # timestamp, render font, OCR Gemini) TIDAK diubah logikanya
 # -- hanya lapisan UI/IO yang disempurnakan tampilannya.
+#
+# V7.5 (baru):
+# - AUTO-FIT font: baris teks yang kepanjangan (misal nama
+#   lokasi panjang) otomatis mengecilkan ukuran font supaya
+#   TIDAK kepotong di tepi kanan foto. Ukuran font tetap sama
+#   rata untuk ketiga baris (bukan per-baris beda ukuran).
 #
 # Credit:
 # Matthew Artur Panahatan Sitorus
@@ -73,6 +79,16 @@ REFERENCE_FONT_SIZE = 70
 # Diatur langsung di sini oleh program (bukan lewat UI) --
 # tinggal ganti angka ini kalau mau lebih besar/kecil lagi.
 DEFAULT_FONT_SIZE_PERCENT = 5.0
+
+# --------------------------------------------------------
+# Batas bawah font size (px) saat auto-fit mengecilkan teks.
+# Ini jaring pengaman supaya teks tidak jadi mikroskopis kalau
+# baris lokasinya sangat-sangat panjang -- kalau sudah mentok
+# batas ini, teks dibiarkan sedikit mepet ke tepi daripada
+# jadi tidak terbaca sama sekali.
+# --------------------------------------------------------
+
+MIN_FONT_SIZE_PX = 14
 
 
 # ============================================================
@@ -569,6 +585,55 @@ def draw_timestamp(
 
 # ============================================================
 # ============================================================
+# UKUR LEBAR TEKS (BUAT AUTO-FIT, TANPA MENGGAMBAR APAPUN)
+# ============================================================
+# ============================================================
+#
+# Rumus lebar ini SENGAJA dibuat identik dengan logika loop
+# di draw_timestamp() di atas (char demi char + letter_spacing,
+# spasi pakai space_scale) supaya angka yang diukur benar-benar
+# merepresentasikan lebar hasil gambar yang sebenarnya.
+# ============================================================
+
+def measure_line_width(
+    measure_draw,
+    text,
+    font,
+    letter_spacing,
+    space_scale
+):
+
+    space_width = measure_draw.textlength(
+        " ",
+        font=font
+    ) * space_scale
+
+    total_width = 0.0
+
+    for char in text:
+
+        if char == " ":
+
+            total_width += (
+                space_width +
+                letter_spacing
+            )
+
+        else:
+
+            total_width += (
+                measure_draw.textlength(
+                    char,
+                    font=font
+                ) +
+                letter_spacing
+            )
+
+    return total_width
+
+
+# ============================================================
+# ============================================================
 # GENERATE TIMESTAMP (LOGIKA SAMA, INPUT/OUTPUT PAKAI BYTES)
 # ============================================================
 # ============================================================
@@ -592,7 +657,7 @@ def generate_timestamp_image(
     height, width = image_cv.shape[:2]
 
     # --------------------------------------------------------
-    # Font size dihitung langsung dari % lebar foto
+    # Font size AWAL dihitung dari % lebar foto (seperti biasa)
     # --------------------------------------------------------
 
     font_size = max(
@@ -603,10 +668,105 @@ def generate_timestamp_image(
         )
     )
 
-    scale_ratio = (
-        font_size /
-        REFERENCE_FONT_SIZE
+    font_path = get_font_path()
+
+    # --------------------------------------------------------
+    # AUTO-FIT
+    #
+    # font_size di atas cuma mempertimbangkan lebar FOTO, belum
+    # mempertimbangkan lebar TEKS. Kalau baris terpanjang
+    # (biasanya baris lokasi) lebih lebar dari ruang yang
+    # tersedia (lebar foto - margin kiri - margin kanan), maka
+    # font dikecilkan proporsional sampai muat, lalu diukur
+    # ulang -- diulang beberapa kali sampai konvergen (biasanya
+    # cukup 1-2 kali karena lebar teks kurang-lebih linear
+    # terhadap font_size).
+    #
+    # font_size tetap SATU ANGKA untuk ketiga baris, biar
+    # tampilannya tetap konsisten & rapi.
+    # --------------------------------------------------------
+
+    measure_draw = ImageDraw.Draw(
+        Image.new(
+            "RGB",
+            (1, 1)
+        )
     )
+
+    scale_ratio = None
+    left_margin = None
+    right_margin = None
+    letter_spacing = None
+    font = None
+
+    for _ in range(6):
+
+        scale_ratio = (
+            font_size /
+            REFERENCE_FONT_SIZE
+        )
+
+        left_margin = round(
+            REFERENCE_LEFT_MARGIN *
+            scale_ratio
+        )
+
+        # Margin kanan dibuat sama dengan margin kiri sebagai
+        # ruang aman simetris, supaya teks tidak mepet ke tepi
+        # kanan foto.
+        right_margin = left_margin
+
+        letter_spacing = (
+            REFERENCE_LETTER_SPACING *
+            scale_ratio
+        )
+
+        font = get_font(
+            font_path,
+            font_size
+        )
+
+        max_line_width = max(
+            measure_line_width(
+                measure_draw, line1, font, letter_spacing, SPACE_SCALE
+            ),
+            measure_line_width(
+                measure_draw, line2, font, letter_spacing, SPACE_SCALE
+            ),
+            measure_line_width(
+                measure_draw, line3, font, letter_spacing, SPACE_SCALE
+            ),
+        )
+
+        available_width = width - left_margin - right_margin
+
+        if max_line_width <= available_width:
+
+            break
+
+        if font_size <= MIN_FONT_SIZE_PX:
+
+            # Sudah mentok batas bawah -- biarkan sedikit mepet
+            # daripada teks jadi tidak terbaca sama sekali.
+            break
+
+        shrink_ratio = available_width / max_line_width
+
+        # Faktor 0.97 = sedikit buffer aman supaya tidak
+        # langsung pas-pasan di tepi banget setelah dibulatkan.
+        font_size = max(
+            MIN_FONT_SIZE_PX,
+            int(font_size * shrink_ratio * 0.97)
+        )
+
+    auto_fit_applied = (
+        font_size <
+        max(1, round(width * (font_size_percent / 100)))
+    )
+
+    # --------------------------------------------------------
+    # Lanjut seperti biasa dengan font_size FINAL hasil auto-fit
+    # --------------------------------------------------------
 
     outline_width = max(
         1,
@@ -614,11 +774,6 @@ def generate_timestamp_image(
             REFERENCE_OUTLINE_WIDTH *
             scale_ratio
         )
-    )
-
-    left_margin = round(
-        REFERENCE_LEFT_MARGIN *
-        scale_ratio
     )
 
     bottom_margin = round(
@@ -639,18 +794,6 @@ def generate_timestamp_image(
     outline_offset_y = round(
         REFERENCE_OUTLINE_OFFSET_Y *
         scale_ratio
-    )
-
-    letter_spacing = (
-        REFERENCE_LETTER_SPACING *
-        scale_ratio
-    )
-
-    font_path = get_font_path()
-
-    font = get_font(
-        font_path,
-        font_size
     )
 
     pil_image = Image.fromarray(
@@ -725,7 +868,8 @@ def generate_timestamp_image(
         "letter_spacing": letter_spacing,
         "left_margin": left_margin,
         "bottom_margin": bottom_margin,
-        "line_spacing": line_spacing
+        "line_spacing": line_spacing,
+        "auto_fit_applied": auto_fit_applied
     }
 
     return pil_image, info
@@ -898,11 +1042,11 @@ timestamp_key = f"timestamp_box_{uploader_version}"
 # HERO HEADER & STEP STATUS BAR
 # ------------------------------------------------------------
 
-st.markdown('<div class="hero-badge">⚡ V7.4 • AVHershey Font Engine</div>', unsafe_allow_html=True)
+st.markdown('<div class="hero-badge">⚡ V7.5 • AVHershey Font Engine + Auto-Fit</div>', unsafe_allow_html=True)
 st.markdown('<div class="hero-title">🕒 Timestamp Generator</div>', unsafe_allow_html=True)
 st.markdown(
     '<div class="hero-desc">Watermark timestamp presisi tinggi gaya <b>GPS Map Camera</b> '
-    'dengan normalisasi orientasi EXIF & OCR bertenaga <b>Gemini AI</b>.</div>',
+    'dengan normalisasi orientasi EXIF, auto-fit font, & OCR bertenaga <b>Gemini AI</b>.</div>',
     unsafe_allow_html=True
 )
 
@@ -1007,7 +1151,9 @@ with st.container(border=True):
 
         st.caption(
             "💡 Masukkan tepat **3 baris**: baris 1 untuk koordinat, "
-            "baris 2 untuk nama lokasi, dan baris 3 untuk tanggal & jam."
+            "baris 2 untuk nama lokasi, dan baris 3 untuk tanggal & jam. "
+            "Baris yang kepanjangan akan otomatis dikecilkan ukuran fontnya "
+            "supaya tidak kepotong (lihat detail setelah Generate)."
         )
 
     with tab_ocr:
@@ -1324,6 +1470,14 @@ if result is not None:
 
         st.success("🎉 **Timestamp Berhasil Digambar!** Foto siap diunduh dengan kualitas tinggi.")
 
+        if result["info"].get("auto_fit_applied"):
+
+            st.info(
+                "📏 **Auto-fit aktif**: salah satu baris teksnya cukup panjang, "
+                "jadi ukuran font otomatis dikecilkan sedikit supaya semua teks "
+                "tetap muat & tidak kepotong."
+            )
+
         st.image(
             result["pil_image"],
             caption=f"Preview Hasil: {result['output_file_name']}",
@@ -1358,7 +1512,8 @@ if result is not None:
 
             st.caption(
                 f"• Font: AVHershey Simplex Medium | Scale Ratio: {info['scale_ratio']:.4f} | "
-                f"Line Spacing: {info['line_spacing']}px | Letter Spacing: {info['letter_spacing']:.2f}px"
+                f"Line Spacing: {info['line_spacing']}px | Letter Spacing: {info['letter_spacing']:.2f}px | "
+                f"Auto-fit: {'Ya' if info['auto_fit_applied'] else 'Tidak perlu'}"
             )
 
         col_download, col_reset = st.columns([2, 1])
