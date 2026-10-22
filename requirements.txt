@@ -1,0 +1,7 @@
+streamlit>=1.40
+pillow>=10.1
+pandas
+requests
+beautifulsoup4
+google-genai
+streamlit-paste-button
