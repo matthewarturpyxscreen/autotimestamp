@@ -1,5 +1,0 @@
-# Streamlit Community Cloud apt packages for PDF/SVG/Office converters.
-# Used only by converter; Python requirements and timestamp engines unchanged.
-libcairo2
-libreoffice
-fonts-dejavu-core
