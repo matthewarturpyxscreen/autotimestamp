@@ -1,0 +1,12 @@
+V9.5.1 CORE INTEGRITY REPORT
+Original archive: AutoTimestamp_V9.5_Smart_Preview.zip
+
+batch_manual.py: UNCHANGED | SHA256 1aefa4a642055b86d5da6befe12c4a9631f4f1fc63af2f7ca2bd9d3a2ce390e9
+batch_npsn.py: UNCHANGED | SHA256 f441b1e9168f3c1753990cfce8c26d8dfab04fa03f8d8c174588379c7a08003b
+ocr_fields.py: UNCHANGED | SHA256 d4367b96ba7f418cc0987819e6c6b293b1c5fbf9bd04c7e191482bbda7aee9f4
+workspace_preview.py: UNCHANGED | SHA256 8d6afed26419ce0da48eeaf7de5bdd81c3d6025b5fdae0dac5bfdf80ba3df39b
+CORE_V941_AST_SHA256.json: UNCHANGED | SHA256 4adff0349b5012216da142b29e4bfa5ee52b50b51a617ba6dd4314a40758b5b2
+
+app.py: only import, mode list, mode route and badge version changed.
+Manifest CORE_V941_AST_SHA256: unchanged; pytest regression hashes: PASS
+All other legacy files: copied unchanged from V9.5.

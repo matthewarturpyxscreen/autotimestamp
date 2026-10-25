@@ -1,0 +1,7 @@
+app.py: 14/15 top-level functions identical by AST, changed=['reset_app']
+batch_manual.py: 15/16 top-level functions identical by AST, changed=['render_batch_mode']
+  Generate loop: identical=True
+batch_npsn.py: 39/40 top-level functions identical by AST, changed=['render_batch_mode']
+  Generate loop: identical=True
+ocr_fields.py: 4/4 top-level functions identical by AST, changed=[]
+Other engine source files unchanged: ocr_fields.py, requirements.txt

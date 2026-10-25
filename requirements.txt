@@ -1,0 +1,15 @@
+streamlit
+opencv-python-headless
+numpy
+pillow
+google-genai
+streamlit-paste-button
+pandas
+openpyxl
+requests
+beautifulsoup4
+
+# Separate V9.6 JPG Converter mode: PDF / SVG / HEIC+AVIF
+pypdfium2>=4.30.0
+CairoSVG>=2.7.0
+pillow-heif>=0.18.0
