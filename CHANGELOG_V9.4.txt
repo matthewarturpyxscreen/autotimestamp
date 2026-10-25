@@ -1,0 +1,23 @@
+AutoTimestamp V9.4 — Workspace Layout (UI-only)
+
+[UI]
+- Mode Satu Foto, Batch Manual, Batch NPSN tetap di navigasi atas.
+- Wide desktop workspace dua panel: input kiri, preview/hasil kanan.
+- Pengaturan kiri memiliki scroll internal; tombol Generate berada di bawahnya.
+- Pengaturan font/bold/koordinat lanjutan dibuat collapsible.
+- Preview menampilkan foto asli ketika baru di-upload, kemudian hasil pasca-Generate.
+- Tombol Download diletakkan di atas preview hasil agar mudah diakses.
+- Penyesuaian tema soft pink/putih dan jarak panel.
+
+[KEKAL / TIDAK DIUBAH]
+- OCR Gemini termasuk auto-fill koordinat + timestamp dan input manual.
+- Dukungan lokasi/timestamp 4+ baris di Batch Manual.
+- Pemrosesan batch, urutan foto, lookup & validasi NPSN.
+- Fungsi font/renderer AVHershey, auto-fit, bold, waktu, metadata & encoding.
+
+[VERIFIKASI]
+- Python compileall: berhasil.
+- 10 regression tests dari V9.3: berhasil.
+- 71 definisi fungsi non-UI pada ketiga modul diperiksa via AST, tanpa perubahan.
+- Pengujian tampilan Streamlit di browser belum dijalankan karena dependency Streamlit
+  tidak tersedia di lingkungan pengembangan dan instalasi tidak dapat diakses.
