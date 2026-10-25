@@ -990,12 +990,10 @@ st.set_page_config(
     page_icon="🕒",
     layout="wide",
     initial_sidebar_state="collapsed"
+)
 
-    
     from pyx_monitor_agent import start_monitoring
     start_monitoring()
-
-)
 
 
 # ------------------------------------------------------------
