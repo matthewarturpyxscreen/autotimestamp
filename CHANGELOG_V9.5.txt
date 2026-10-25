@@ -1,0 +1,37 @@
+AUTOTIMESTAMP V9.5 — SMART PREVIEW (UI ONLY)
+Sumber: ZIP AutoTimestamp_V9.4.1_Compact_Gallery.zip
+
+Fitur yang ditambahkan (hanya 5 sesuai scope):
+1. Live Preview saat input teks/font/bold/jadwal berubah menggunakan callback
+   generate_timestamp_image yang sudah ada. Bukan engine rendering kedua.
+2. Thumbnail foto Batch Manual dan Batch NPSN langsung bisa diklik.
+   Implementasi dengan button Streamlit yang memakai background thumbnail.
+   Lima foto per halaman dan panah navigasi; foto aktif diberi outline pink.
+3. Zoom 50–200% dan Fit mengembalikan 100% di sisi preview saja.
+4. Before / After berdampingan dengan sumber asli. Setelah Generate selesai,
+   After menggunakan isi aktual dari file hasil/ZIP. Sebelum Generate,
+   After adalah pratinjau live, bukan file final.
+5. Jika foto, OCR/teks, jadwal, font, koordinat, atau pengaturan output berubah,
+   tampil peringatan bahwa hasil lama sudah tidak sesuai. Tombol Download
+   dari hasil lama dinonaktifkan sampai Generate ulang.
+
+BATASAN PREVIEW BATCH (penting):
+- Pratinjau live memakai jam mulai dan koordinat dasar yang dipilih user.
+- Proses Generate tetap memilih jam acak/berurutan dan variasi koordinat
+  (bila diaktifkan) menggunakan mekanisme aslinya.
+- Sesudah Generate, tampilan Hasil Generate menunjukkan foto persis yang
+  tersimpan di ZIP, bukan menebak ulang hasil acak.
+
+TETAP IDENTIK DENGAN V9.4.1:
+- app.py: seluruh fungsi inti kecuali callback UI reset_app.
+- batch_manual.py dan batch_npsn.py: seluruh fungsi utilitas/engine tetap;
+  blok loop pengolahan foto generate batch identik secara AST.
+- ocr_fields.py: identik sepenuhnya.
+- ZIP format, nama file keluaran, JPEG quality, PNG output, parameter renderer,
+  NPSN fallback/validasi, waktu batch, font, normalisasi, dan OCR tidak berubah.
+
+CATATAN UJI:
+- Tes otomatis bisa dijalankan tanpa Streamlit/Gemini via python -m pytest -q.
+- Pengujian browser Streamlit belum dapat dijalankan di lingkungan pembuat
+  paket (modul Streamlit tidak terpasang/tersedia). Jalankan smoke test di
+  instalasi Streamlit Anda untuk memastikan tampilan sesuai browser.
