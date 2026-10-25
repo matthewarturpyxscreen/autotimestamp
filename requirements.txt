@@ -9,6 +9,9 @@ openpyxl
 requests
 beautifulsoup4
 
+psutil>=5.9,<8
+
+
 # Separate V9.6 JPG Converter mode: PDF / SVG / HEIC+AVIF
 pypdfium2>=4.30.0
 CairoSVG>=2.7.0
