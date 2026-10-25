@@ -992,9 +992,11 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-    from pyx_monitor_agent import start_monitoring
-    start_monitoring()
-
+# ============================================================
+# PYX SERVER MONITOR
+# ============================================================
+from pyx_monitor_agent import start_monitoring
+start_monitoring()
 
 # ------------------------------------------------------------
 # CUSTOM CSS UNTUK TAMPILAN MODERN & CLEAN
