@@ -996,7 +996,13 @@ st.set_page_config(
 # PYX SERVER MONITOR
 # ============================================================
 from pyx_monitor_agent import start_monitoring
-start_monitoring()
+
+monitor_active = start_monitoring()
+
+st.caption(
+    "PYX Monitor Agent: "
+    + ("AKTIF" if monitor_active else "TIDAK AKTIF")
+)
 
 # ------------------------------------------------------------
 # CUSTOM CSS UNTUK TAMPILAN MODERN & CLEAN
