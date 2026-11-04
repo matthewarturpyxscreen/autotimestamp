@@ -1,0 +1,6 @@
+# AutoTimestamp PYX - theme follows device/browser preference.
+# Deliberately do not set [theme] base, backgroundColor, or textColor.
+# Streamlit will use the viewer's system theme unless they previously
+# selected a theme manually in their browser.
+[client]
+toolbarMode = "minimal"
