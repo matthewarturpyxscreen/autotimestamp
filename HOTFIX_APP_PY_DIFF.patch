@@ -1,0 +1,91 @@
+--- before/app.py
++++ after/app.py
+@@ -59,7 +59,7 @@
+     pbutton = None
+ 
+ from pyx_geotag_templates import (
+-    TEMPLATE_CLASSIC, TEMPLATE_CAMERA_GPS, TEMPLATE_OPTIONS, render_camera_gps,
++    TEMPLATE_CLASSIC, TEMPLATE_CAMERA_GPS, TEMPLATE_OPTIONS,
+ )
+ from workspace_preview import compact_preview, input_signature, output_is_stale, single_preview, cached_single_photo
+ from pyx_image_job_guard import image_job_slot
+@@ -999,10 +999,13 @@
+ 
+ 
+ def generate_timestamp_with_template(image_cv, raw_timestamp_text, *args, template=None, **kwargs):
+-    """Dispatch a selected style; the existing generator remains untouched."""
+-    selected = template or st.session_state.get('pyx_geotag_template', TEMPLATE_CLASSIC)
+-    if selected == TEMPLATE_CAMERA_GPS:
+-        return render_camera_gps(image_cv, raw_timestamp_text, *args, **kwargs)
++    """Always use the untouched Original AVHershey bottom-left renderer.
++
++    The Batch NPSN adapter handles its requested GPS line ORDER separately
++    and deliberately passes template='classic' into this function. Do not
++    re-enable the legacy top-left renderer here: both preview and export must
++    match the Original font, margins, and outline in every generate mode.
++    """
+     return generate_timestamp_image(image_cv, raw_timestamp_text, *args, **kwargs)
+ 
+ 
+@@ -1647,21 +1650,32 @@
+         _template_labels = list(_npsn_labels)
+         _label_map = _npsn_labels
+     else:
+-        _label_map = TEMPLATE_OPTIONS
++        # Satu Foto + Batch Manual keep exactly the legacy Original renderer.
++        # The NPSN GPS line-order option stays available in its own mode.
++        _label_map = {
++            label: code for label, code in TEMPLATE_OPTIONS.items()
++            if code == TEMPLATE_CLASSIC
++        }
++        _template_labels = list(_label_map)
+     _template_default_index = next(
+         (idx for idx, label in enumerate(_template_labels)
+          if _label_map[label] == _template_default), 0
+     )
+-    # Migrate V9.5.2.4.20's old label so an existing Streamlit session
+-    # does not retain a selectbox value that is no longer in the options.
+-    if _npsn_template_mode:
+-        _old_npsn_label = st.session_state.get(_template_widget_key)
+-        if _old_npsn_label in TEMPLATE_OPTIONS and _old_npsn_label not in _label_map:
+-            _old_template = TEMPLATE_OPTIONS[_old_npsn_label]
+-            st.session_state[_template_widget_key] = next(
+-                (label for label, code in _label_map.items() if code == _old_template),
+-                _template_labels[_template_default_index]
+-            )
++    # Streamlit remembers selectbox choices across redeploys/mode changes.
++    # Migrate old labels BEFORE creating the widget, including old Kamera GPS
++    # choices in Satu Foto/Batch Manual and the former NPSN label.
++    _stored_label = st.session_state.get(_template_widget_key)
++    if _stored_label is not None and _stored_label not in _label_map:
++        _previous_template = TEMPLATE_OPTIONS.get(_stored_label)
++        st.session_state[_template_widget_key] = next(
++            (label for label, code in _label_map.items()
++             if code == _previous_template),
++            _template_labels[_template_default_index],
++        )
++        if not _npsn_template_mode and _previous_template == TEMPLATE_CAMERA_GPS:
++            # Never leave an already-rendered top-left JPG visible/downloadable.
++            st.session_state['generated_result'] = None
++            st.session_state['batch_manual_generated_result'] = None
+     selected_template_label = st.selectbox(
+         "🎨 Template Geotag",
+         options=_template_labels,
+@@ -1671,7 +1685,7 @@
+             "Batch NPSN: Kamera GPS mengubah urutan alamat → waktu → koordinat "
+             "tanpa mengubah posisi/font geotag yang sebelumnya."
+             if _npsn_template_mode else
+-            "Original: koordinat → alamat → waktu. Kamera GPS: alamat → waktu → koordinat."
++            "Original: koordinat → alamat → waktu; posisi kiri bawah dan font AVHershey."
+         ),
+     )
+     st.session_state['pyx_geotag_template'] = _label_map[selected_template_label]
+@@ -1684,8 +1698,6 @@
+              else "Original (koordinat → alamat → tanggal/jam; posisi tidak berubah)") +
+             "**. Live Preview dan JPG di ZIP mengikuti pilihan ini."
+         )
+-    elif st.session_state['pyx_geotag_template'] == TEMPLATE_CAMERA_GPS:
+-        st.caption("📍 Kamera GPS: alamat (baris mengikuti input) → tanggal/jam → koordinat. Teks putih berbayang gelap pada kiri atas foto.")
+ 
+ # Refresh presence every 60 seconds while the browser remains connected.
+ # One random session token stays in browser session_state and NEVER reaches Redis.

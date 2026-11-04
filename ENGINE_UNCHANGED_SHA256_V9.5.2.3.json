@@ -1,0 +1,10 @@
+{
+  "batch_manual.py": "46945753580c8338a43dc122b54eea592afb7f3c3e6b7f5f4d0e98a695365bf5",
+  "batch_npsn.py": "03f79d412231f6296e9c48ae42c109fd035905804dce9bf42cc4d1f5e735c4ea",
+  "ocr_fields.py": "d4367b96ba7f418cc0987819e6c6b293b1c5fbf9bd04c7e191482bbda7aee9f4",
+  "jpg_converter.py": "bd4300b6ecbf062d7f1bf2364eb3099066bf2f5c85fbcc0735c553999b0ca47b",
+  "jpg_converter_ui.py": "a63a7ea10910cec8c0064bcb4917fc7c72600bffb45b71c0a5ae4156eb99cf58",
+  "workspace_preview.py": "69cbc41c6f83e6ca9579c31c034300a9dab11a91bb9fd2ee016d43734fe489b5",
+  "requirements.txt": "89aa085cfc06f8602c37e27d1c731a5e91f7a29021a0ed6ea6e9d9f2674a443c",
+  ".streamlit/config.toml": "9e07ea9743051cb0056ed1bc48384948bb22e4c6f34e8b42636c35a8ff249170"
+}

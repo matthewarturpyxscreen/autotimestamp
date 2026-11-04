@@ -1,0 +1,13 @@
+{
+  "baseline": "V9.5.2.3",
+  "unaltered_files_sha256": {
+    "app.py": "76bc2d774ef00c0d446db6b7457508cb87a90593e95be3365a6d319449893de4",
+    "batch_manual.py": "46945753580c8338a43dc122b54eea592afb7f3c3e6b7f5f4d0e98a695365bf5",
+    "batch_npsn.py": "03f79d412231f6296e9c48ae42c109fd035905804dce9bf42cc4d1f5e735c4ea",
+    "ocr_fields.py": "d4367b96ba7f418cc0987819e6c6b293b1c5fbf9bd04c7e191482bbda7aee9f4",
+    "requirements.txt": "89aa085cfc06f8602c37e27d1c731a5e91f7a29021a0ed6ea6e9d9f2674a443c",
+    ".streamlit/config.toml": "9e07ea9743051cb0056ed1bc48384948bb22e4c6f34e8b42636c35a8ff249170"
+  },
+  "jpeg_codec_ast_unchanged": true,
+  "conversion_zip_spool_only_opt_in": true
+}

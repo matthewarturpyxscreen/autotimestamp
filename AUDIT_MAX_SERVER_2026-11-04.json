@@ -1,0 +1,41 @@
+{
+  "product": "AutoTimestamp V9.5.2.4.21",
+  "base_upload": "autotimestamp-main(4).zip",
+  "prior_optimized_zip": "AutoTimestamp_Optimized_Server_2026-11-04.zip",
+  "build": "04 Nov 2026 MAX Safe Server",
+  "focus": "UI preview cache, dimension-only font lock, reduced PNG EXIF copies, low-priority preview concurrency, previous ZIP spooling",
+  "production_engine_changed": false,
+  "core_ast_functions_verified": 72,
+  "npsn_template_adapter_ast_unchanged": [
+    "_render_npsn_template_checked",
+    "_make_npsn_preview_renderer"
+  ],
+  "unchanged_files_byte_identical": [
+    "ocr_fields.py",
+    "pyx_geotag_templates.py",
+    "jpg_converter.py",
+    "jpg_converter_cloud.py",
+    "pyx_maintenance.py",
+    "pyx_monitor_agent.py",
+    "pyx_monitor_activity.py",
+    "requirements.txt",
+    ".streamlit/config.toml"
+  ],
+  "pytest_passed": 76,
+  "pytest_failed": 0,
+  "offline_only": true,
+  "not_verified_on_live_cloud": true,
+  "deployment_notes": "Overwrite only the 6 modified application modules and add 2 helper modules, or overlay the full ZIP on the GitHub repo. Keep Streamlit Secrets intact.",
+  "changed_existing_code_files": [
+    "workspace_preview.py",
+    "jpg_converter_ui.py",
+    "jpg_converter_resource_guard.py",
+    "batch_manual.py",
+    "batch_npsn.py",
+    "app.py"
+  ],
+  "new_runtime_modules": [
+    "pyx_image_job_guard.py",
+    "pyx_batch_archive.py"
+  ]
+}
