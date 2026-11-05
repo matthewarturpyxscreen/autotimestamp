@@ -1048,7 +1048,7 @@ _pyx_ctrl_app_id = _pyx_maintenance_setting("PYX_METRICS_APP_ID") or "timestamp-
 _pyx_maintenance_status = _pyx_read_maintenance(_pyx_ctrl_url, _pyx_ctrl_token, _pyx_ctrl_app_id)
 st.session_state["_pyx_maintenance_page_visible"] = _pyx_maintenance_status.enabled
 
-@st.fragment(run_every="20s")
+@st.fragment(run_every="30s")
 def _pyx_maintenance_watch():
     status = _pyx_read_maintenance(_pyx_ctrl_url, _pyx_ctrl_token, _pyx_ctrl_app_id)
     # A full rerun is needed only on entering/leaving the locked UI.
